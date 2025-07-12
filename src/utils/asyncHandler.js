@@ -1,5 +1,5 @@
 /* asyncHandler function is a custom wrapper for handling errors in asynchronous express route handlers so you dont have to write try and catch in every single route instead of this we make a generalised function */
-
+// (Like a helper layer) 
 
 // const asyncHandler = () => {}
 
