@@ -97,6 +97,8 @@ const registerUser = asyncHandler( async (req , res) => {
         "-password -refreshToken"
     )
 
+
+
     if(!checkUserCreated){
         throw new ApiError(500 , "User is not created");
     }
@@ -152,9 +154,9 @@ const loginUser = asyncHandler(async(req , res) => {
     )
 
     const options = {
-        httpOnly: true,
-        secure: true,
-    }
+        httpOnly: true,   // Keeps the cookie hidden from browser JavaScript (protects against XSS attacks)
+        secure: true      // Sends the cookie only over HTTPS (protects against packet sniffing)
+    };
 
     return res.status(200)
     .cookie("accessToken" , accessToken , options)
@@ -314,16 +316,18 @@ const updateAvatar = asyncHandler(async (req , res) => {
 
 
 const getUserChannelProfile = asyncHandler(async(req , res) => {
-    
+
+    // get user profile using user profile url
     const {username} = req.params
 
     if(!username?.trim()){
-        throw new ApiError(400 , "username is missing");
+        throw new ApiError(404 , "username is missing")
     }
 
-    const channer = await User.aggregate([
+
+    const channel = await User.aggregate([
         {
-            $match : {
+            $match: {
                 username: username?.toLowerCase()
             }
         },
@@ -331,8 +335,8 @@ const getUserChannelProfile = asyncHandler(async(req , res) => {
         {
             $lookup: {
                 from: "subscriptions",
-                localField: "channel",
-                foreignField: "_id",
+                localField: "_id",
+                foreignField: "channel",
                 as: "subscribers"
             }
         },
@@ -340,15 +344,15 @@ const getUserChannelProfile = asyncHandler(async(req , res) => {
         {
             $lookup: {
                 from: "subscriptions",
-                localField: "subscriber",
-                foreignField: "_id",
+                localField: "_id",
+                foreignField: "subscriber",
                 as: "subscribedTo"
             }
         },
 
         {
             $addFields: {
-                subscribersCount: {
+                subscriberCount: {
                     $size: "$subscribers"
                 },
 
@@ -358,7 +362,7 @@ const getUserChannelProfile = asyncHandler(async(req , res) => {
 
                 isSubscribed: {
                     $cond: {
-                        if: {$in: [req.user?._id , "$subscribers.subscriber"]},
+                        if: {$in: [req.user?._id , "$subscribers"]},
                         then: true,
                         else: false
                     }
@@ -370,12 +374,26 @@ const getUserChannelProfile = asyncHandler(async(req , res) => {
             $project: {
                 fullName: 1,
                 username: 1,
-                subscribersCount: 1,
-                channelSubscribedToCount: 1
+                subscriberCount: 1,
+                channelSubscribedToCount: 1,
+                isSubscribed: 1,
+                avatar: 1,
+                coverImage: 1,
+                email: 1
             }
         }
-        
     ])
+
+
+    if(!channel?.length){
+        throw new ApiError(404 , "Channel does not exist"); 
+    }
+
+
+    return res.status(200)
+    .json(
+        new ApiResponse(201 , channel[0] , "User Profile Created")
+    )
 })
 
 export {
